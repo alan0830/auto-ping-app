@@ -14,6 +14,8 @@ import com.autoping.app.databinding.ActivityMainBinding
 import kotlinx.coroutines.*
 import java.io.BufferedReader
 import java.io.InputStreamReader
+import java.net.HttpURLConnection
+import java.net.URL
 import java.util.Locale
 import java.util.regex.Pattern
 
@@ -25,6 +27,9 @@ class MainActivity : AppCompatActivity() {
     private var pingJob: Job? = null
     private var pingProcess: Process? = null
     private var isRunning: Boolean = false
+
+    private var ipJob: Job? = null
+    private var currentPublicIp: String? = null
 
     // Statistics
     private var countSent: Long = 0
@@ -57,6 +62,9 @@ class MainActivity : AppCompatActivity() {
         loadPreferences()
         setupListeners()
 
+        // 載入時查詢裝置對外 IP
+        refreshPublicIp()
+
         // 點開程式後，自動開始對指定 IP 持續 ping
         startPing()
     }
@@ -86,6 +94,25 @@ class MainActivity : AppCompatActivity() {
     }
 
     private fun setupListeners() {
+        // Refresh Public IP
+        binding.btnRefreshIp.setOnClickListener {
+            refreshPublicIp()
+        }
+
+        // Copy Public IP
+        binding.btnCopyIp.setOnClickListener {
+            copyPublicIp()
+        }
+
+        // Tap on Public IP text directly to copy (or retry if failed)
+        binding.tvPublicIp.setOnClickListener {
+            if (currentPublicIp == null) {
+                refreshPublicIp()
+            } else {
+                copyPublicIp()
+            }
+        }
+
         // Toggle Start / Stop
         binding.btnTogglePing.setOnClickListener {
             if (isRunning) {
@@ -147,6 +174,7 @@ class MainActivity : AppCompatActivity() {
     private fun restartPing() {
         stopPing()
         resetStats()
+        refreshPublicIp()
         startPing()
     }
 
@@ -305,5 +333,76 @@ class MainActivity : AppCompatActivity() {
     override fun onDestroy() {
         super.onDestroy()
         stopPing()
+        ipJob?.cancel()
+    }
+
+    private fun copyPublicIp() {
+        val ip = currentPublicIp
+        if (!ip.isNullOrEmpty()) {
+            val clipboard = getSystemService(Context.CLIPBOARD_SERVICE) as ClipboardManager
+            val clip = ClipData.newPlainText("Device Public IP", ip)
+            clipboard.setPrimaryClip(clip)
+            Toast.makeText(this, getString(R.string.msg_ip_copied, ip), Toast.LENGTH_SHORT).show()
+        } else {
+            Toast.makeText(this, getString(R.string.msg_no_ip_to_copy), Toast.LENGTH_SHORT).show()
+        }
+    }
+
+    private fun refreshPublicIp() {
+        ipJob?.cancel()
+        binding.tvPublicIp.text = getString(R.string.public_ip_loading)
+        binding.tvPublicIp.setTextColor(ContextCompat.getColor(this, R.color.terminal_text_muted))
+
+        ipJob = CoroutineScope(Dispatchers.IO).launch {
+            val ip = fetchPublicIp()
+            withContext(Dispatchers.Main) {
+                if (ip != null) {
+                    currentPublicIp = ip
+                    binding.tvPublicIp.text = ip
+                    binding.tvPublicIp.setTextColor(ContextCompat.getColor(this@MainActivity, R.color.primary_accent))
+                } else {
+                    currentPublicIp = null
+                    binding.tvPublicIp.text = getString(R.string.public_ip_failed)
+                    binding.tvPublicIp.setTextColor(ContextCompat.getColor(this@MainActivity, R.color.terminal_text_red))
+                }
+            }
+        }
+    }
+
+    private fun fetchPublicIp(): String? {
+        val endpoints = listOf(
+            "https://api.ipify.org",
+            "https://icanhazip.com",
+            "https://checkip.amazonaws.com",
+            "https://ifconfig.me/ip"
+        )
+        val ipRegex = Regex("^[0-9a-fA-F.:]{7,45}$")
+
+        for (endpoint in endpoints) {
+            var connection: HttpURLConnection? = null
+            try {
+                val url = URL(endpoint)
+                connection = (url.openConnection() as HttpURLConnection).apply {
+                    requestMethod = "GET"
+                    connectTimeout = 3500
+                    readTimeout = 3500
+                    useCaches = false
+                    setRequestProperty("User-Agent", "AutoPingApp/1.0")
+                }
+                if (connection.responseCode == HttpURLConnection.HTTP_OK) {
+                    val response = connection.inputStream.bufferedReader().use { it.readText() }.trim()
+                    if (response.matches(ipRegex)) {
+                        return response
+                    }
+                }
+            } catch (_: Exception) {
+                // Fallback to next endpoint
+            } finally {
+                try {
+                    connection?.disconnect()
+                } catch (_: Exception) {}
+            }
+        }
+        return null
     }
 }

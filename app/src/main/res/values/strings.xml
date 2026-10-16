@@ -14,4 +14,11 @@
     <string name="stat_recv">已收到</string>
     <string name="stat_loss">遺失率</string>
     <string name="stat_avg">平均延遲</string>
+    <string name="public_ip_label">🌐 對外 IP：</string>
+    <string name="public_ip_loading">查詢中…</string>
+    <string name="public_ip_failed">無法取得 (點擊重試)</string>
+    <string name="btn_refresh_ip">重整</string>
+    <string name="btn_copy_ip">複製</string>
+    <string name="msg_ip_copied">已複製對外 IP: %1$s</string>
+    <string name="msg_no_ip_to_copy">尚未取得對外 IP</string>
 </resources>
