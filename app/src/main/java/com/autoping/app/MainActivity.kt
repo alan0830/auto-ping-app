@@ -15,9 +15,19 @@ import kotlinx.coroutines.*
 import java.io.BufferedReader
 import java.io.InputStreamReader
 import java.net.HttpURLConnection
+import java.net.Inet4Address
+import java.net.NetworkInterface
 import java.net.URL
+import java.util.Collections
 import java.util.Locale
 import java.util.regex.Pattern
+
+data class DeviceIpInfo(
+    val ip: String,
+    val type: String? = null
+) {
+    fun display(): String = if (!type.isNullOrEmpty()) "$ip ($type)" else ip
+}
 
 class MainActivity : AppCompatActivity() {
 
@@ -30,6 +40,7 @@ class MainActivity : AppCompatActivity() {
 
     private var ipJob: Job? = null
     private var currentPublicIp: String? = null
+    private var currentLocalIpInfo: DeviceIpInfo? = null
 
     // Statistics
     private var countSent: Long = 0
@@ -62,8 +73,8 @@ class MainActivity : AppCompatActivity() {
         loadPreferences()
         setupListeners()
 
-        // 載入時查詢裝置對外 IP
-        refreshPublicIp()
+        // 載入時查詢手機本機 IP 與裝置對外 IP
+        refreshNetworkIps()
 
         // 點開程式後，自動開始對指定 IP 持續 ping
         startPing()
@@ -94,9 +105,23 @@ class MainActivity : AppCompatActivity() {
     }
 
     private fun setupListeners() {
-        // Refresh Public IP
+        // Refresh All Network IPs (Local & Public)
         binding.btnRefreshIp.setOnClickListener {
-            refreshPublicIp()
+            refreshNetworkIps()
+        }
+
+        // Copy Local IP
+        binding.btnCopyLocalIp.setOnClickListener {
+            copyLocalIp()
+        }
+
+        // Tap on Local IP text directly to copy (or retry if failed)
+        binding.tvLocalIp.setOnClickListener {
+            if (currentLocalIpInfo == null) {
+                refreshLocalIp()
+            } else {
+                copyLocalIp()
+            }
         }
 
         // Copy Public IP
@@ -174,7 +199,7 @@ class MainActivity : AppCompatActivity() {
     private fun restartPing() {
         stopPing()
         resetStats()
-        refreshPublicIp()
+        refreshNetworkIps()
         startPing()
     }
 
@@ -206,6 +231,8 @@ class MainActivity : AppCompatActivity() {
 
         appendLogLine("=========================================")
         appendLogLine("⚡ 自動開始 持續 Ping: $ip")
+        currentLocalIpInfo?.let { appendLogLine("📱 手機 IP: ${it.display()}") }
+        currentPublicIp?.let { appendLogLine("🌐 對外 IP: $it") }
         appendLogLine("⏱ 間隔設定: ${safeInterval}s")
         appendLogLine("=========================================\n")
 
@@ -336,6 +363,23 @@ class MainActivity : AppCompatActivity() {
         ipJob?.cancel()
     }
 
+    private fun refreshNetworkIps() {
+        refreshLocalIp()
+        refreshPublicIp()
+    }
+
+    private fun copyLocalIp() {
+        val info = currentLocalIpInfo
+        if (info != null && info.ip.isNotEmpty()) {
+            val clipboard = getSystemService(Context.CLIPBOARD_SERVICE) as ClipboardManager
+            val clip = ClipData.newPlainText("Device Local IP", info.ip)
+            clipboard.setPrimaryClip(clip)
+            Toast.makeText(this, getString(R.string.msg_local_ip_copied, info.ip), Toast.LENGTH_SHORT).show()
+        } else {
+            Toast.makeText(this, getString(R.string.msg_no_local_ip_to_copy), Toast.LENGTH_SHORT).show()
+        }
+    }
+
     private fun copyPublicIp() {
         val ip = currentPublicIp
         if (!ip.isNullOrEmpty()) {
@@ -345,6 +389,63 @@ class MainActivity : AppCompatActivity() {
             Toast.makeText(this, getString(R.string.msg_ip_copied, ip), Toast.LENGTH_SHORT).show()
         } else {
             Toast.makeText(this, getString(R.string.msg_no_ip_to_copy), Toast.LENGTH_SHORT).show()
+        }
+    }
+
+    private fun refreshLocalIp() {
+        binding.tvLocalIp.text = getString(R.string.local_ip_loading)
+        binding.tvLocalIp.setTextColor(ContextCompat.getColor(this, R.color.terminal_text_muted))
+
+        CoroutineScope(Dispatchers.IO).launch {
+            val localInfo = fetchLocalIp()
+            withContext(Dispatchers.Main) {
+                if (localInfo != null) {
+                    currentLocalIpInfo = localInfo
+                    binding.tvLocalIp.text = localInfo.display()
+                    binding.tvLocalIp.setTextColor(ContextCompat.getColor(this@MainActivity, R.color.primary_accent))
+                } else {
+                    currentLocalIpInfo = null
+                    binding.tvLocalIp.text = getString(R.string.local_ip_failed)
+                    binding.tvLocalIp.setTextColor(ContextCompat.getColor(this@MainActivity, R.color.terminal_text_red))
+                }
+            }
+        }
+    }
+
+    private fun fetchLocalIp(): DeviceIpInfo? {
+        try {
+            val interfaces = NetworkInterface.getNetworkInterfaces() ?: return null
+            val candidates = ArrayList<DeviceIpInfo>()
+
+            for (intf in Collections.list(interfaces)) {
+                if (!intf.isUp || intf.isLoopback) continue
+                val name = intf.name.lowercase(Locale.ROOT)
+
+                for (addr in Collections.list(intf.inetAddresses)) {
+                    if (addr.isLoopbackAddress || addr.isLinkLocalAddress) continue
+                    val host = addr.hostAddress ?: continue
+                    val cleanIp = host.split("%")[0].trim()
+
+                    if (addr is Inet4Address || (cleanIp.indexOf(':') < 0 && cleanIp.matches(Regex("^[0-9.]+$")))) {
+                        val type = when {
+                            name.contains("wlan") || name.contains("wifi") -> "Wi-Fi"
+                            name.contains("rmnet") || name.contains("ccmni") || name.contains("pdp") || name.contains("radio") || name.contains("wwan") -> "行動數據"
+                            name.contains("eth") -> "乙太網"
+                            name.contains("tun") || name.contains("tap") || name.contains("ppp") -> "VPN"
+                            else -> null
+                        }
+                        candidates.add(DeviceIpInfo(cleanIp, type))
+                    }
+                }
+            }
+
+            return candidates.firstOrNull { it.type == "Wi-Fi" }
+                ?: candidates.firstOrNull { it.type == "行動數據" }
+                ?: candidates.firstOrNull { it.type == "乙太網" }
+                ?: candidates.firstOrNull { it.type == "VPN" }
+                ?: candidates.firstOrNull()
+        } catch (_: Exception) {
+            return null
         }
     }
 
