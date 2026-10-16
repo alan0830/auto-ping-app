@@ -193,10 +193,9 @@ class MainActivity : AppCompatActivity() {
                 pingProcess = process
 
                 val reader = BufferedReader(InputStreamReader(process.inputStream))
-                var line: String?
 
-                while (isActive && reader.readLine().also { line = it } != null) {
-                    val currentLine = line ?: continue
+                while (isActive) {
+                    val currentLine = reader.readLine() ?: break
                     parsePingOutput(currentLine)
 
                     withContext(Dispatchers.Main) {
