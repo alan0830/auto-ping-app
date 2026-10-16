@@ -1,0 +1,17 @@
+<resources>
+    <string name="app_name">Auto Ping</string>
+    <string name="target_ip_hint">目標 IP 或網域名稱 (如 8.8.8.8)</string>
+    <string name="interval_hint">間隔 (秒)</string>
+    <string name="status_running">持續 Ping 測試中…</string>
+    <string name="status_stopped">已停止</string>
+    <string name="btn_stop">停止</string>
+    <string name="btn_start">開始 Ping</string>
+    <string name="btn_restart">重新開始</string>
+    <string name="btn_clear">清除畫面</string>
+    <string name="btn_copy">複製日誌</string>
+    <string name="keep_screen_on">保持螢幕常亮 (防休眠)</string>
+    <string name="stat_sent">已發送</string>
+    <string name="stat_recv">已收到</string>
+    <string name="stat_loss">遺失率</string>
+    <string name="stat_avg">平均延遲</string>
+</resources>

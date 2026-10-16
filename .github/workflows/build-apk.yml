@@ -1,0 +1,72 @@
+name: Build and Release Android APK
+
+on:
+  push:
+    branches: [ "main", "master" ]
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+jobs:
+  build:
+    name: Build AutoPing APK
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout Repository
+        uses: actions/checkout@v4
+
+      - name: Set up JDK 17
+        uses: actions/setup-java@v4
+        with:
+          distribution: 'temurin'
+          java-version: '17'
+
+      - name: Setup Gradle
+        uses: gradle/actions/setup-gradle@v4
+        with:
+          gradle-version: '8.7'
+
+      - name: Build Debug APK
+        run: |
+          gradle assembleDebug --no-daemon --stacktrace
+
+      - name: Prepare APK for Release
+        run: |
+          mkdir -p output
+          cp app/build/outputs/apk/debug/app-debug.apk output/AutoPing-v1.0.0.apk
+          ls -la output
+
+      - name: Upload APK Artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: AutoPing-v1.0.0-APK
+          path: output/AutoPing-v1.0.0.apk
+          retention-days: 14
+
+      - name: Create or Update GitHub Release
+        uses: softprops/action-gh-release@v2
+        with:
+          tag_name: v1.0.0
+          name: "AutoPing v1.0.0"
+          body: |
+            ## ⚡ AutoPing Android APK
+
+            點開程式後自動對指定 IP 持續 Ping 的 Android 工具。
+
+            ### 📲 下載安裝
+            - 下方 Assets 列表點擊 **`AutoPing-v1.0.0.apk`** 直接下載至手機安裝。
+            - 首次安裝若提示「不明來源應用程式」，點擊允許即可。
+
+            ### ✨ 功能特色
+            - **點開即跑**：打開 App 自動啟動持續 Ping。
+            - **自訂 IP & 間隔**：支援隨時修改目標 IP / 網域名稱與間隔秒數。
+            - **記憶功能**：自動記住上次離開時的 IP 與頻率設定。
+            - **防休眠常亮**：預設螢幕常亮，避免休眠斷網。
+            - **即時數據儀表板**：統計發送數、接收數、遺失率 (%) 及平均延遲 (ms)。
+          files: output/AutoPing-v1.0.0.apk
+          draft: false
+          prerelease: false
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
