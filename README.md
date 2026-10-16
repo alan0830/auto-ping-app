@@ -2,6 +2,15 @@
 
 專為 Android 設計的極速網路持續 Ping 監控工具。
 
+[![Download APK](https://img.shields.io/badge/Download-AutoPing%20APK-00E5FF?style=for-the-badge&logo=android)](https://github.com/alan0830/auto-ping-app/releases/tag/v1.0.0)
+
+## 📲 直接下載安裝
+
+點擊下方連結直接下載已編譯好的 APK，傳送到手機或以手機瀏覽器開啟安裝即可：
+👉 **[下載 AutoPing-v1.0.0.apk (GitHub Release)](https://github.com/alan0830/auto-ping-app/releases/download/v1.0.0/AutoPing-v1.0.0.apk)**
+
+---
+
 ## ✨ 特色功能
 
 1. **點開即跑**：開啟 App 即刻自動對指定 IP 啟動持續 Ping，無需每次手動點擊開始。
@@ -19,28 +28,23 @@
 
 ---
 
-## 🚀 如何透過 GitHub Actions 免費自動打包 APK
+## 🕹️ 介面按鈕與操作說明
 
-您完全不需要在電腦安裝肥大的 Android Studio 或 Java 環境，只要將此專案推送到您的 GitHub，GitHub 雲端就會在 1 分鐘內自動編譯出安裝檔（`.apk`）：
+| 按鈕 / 控制元件 | 狀態與說明 |
+| :--- | :--- |
+| **停止 / 開始按鈕** | • **運行中**：顯示為 **紅色「停止」按鈕**，點擊立即中斷 Ping 測試。<br>• **停止後**：動態切換為 **綠色「開始 Ping」按鈕**，點擊即可隨時再度開跑。 |
+| **重啟按鈕** | 修改上方目標 IP 或間隔時間後，點擊「重啟」會立即停止舊測試並套用新設定重新開始。 |
+| **保持螢幕常亮** | 預設為勾選狀態，避免手機螢幕變暗待機時，Android 系統將 WiFi 或行動網路轉入節能省電模式導致測試中斷。 |
+| **清除按鈕** | 位於終端視窗右上角，點擊可重設發送/接收/丟包率統計數據，並清空目前終端畫面。 |
+| **複製按鈕** | 位於終端視窗右上角，一鍵將目前終端累積的所有 Ping 回應紀錄複製到手機剪貼簿。 |
+| **狀態指示燈** | 位於頂部標題右側，即時顯示綠色 `● RUNNING`（測試中）或灰色 `○ STOPPED`（已停止）。 |
 
-### 步驟 1：在 GitHub 建立一個新 Repository
-1. 前往 [GitHub](https://github.com/new) 建立一個新儲存庫（例如命名為 `auto-ping-app`），設為 Public 或 Private 皆可。
+---
 
-### 步驟 2：將本目錄推送至 GitHub
-在專案根目錄執行以下指令（請將 `<你的-github-帳號>` 與 `<你的-repo-名稱>` 換成你的）：
+## 🚀 GitHub Actions 自動打包
 
-```bash
-cd C:\Users\alan0\.gemini\antigravity-ide\scratch\auto-ping-app
-git init
-git add .
-git commit -m "feat: init auto-ping-app with github actions"
-git branch -M main
-git remote add origin https://github.com/<你的-github-帳號>/<你的-repo-名稱>.git
-git push -u origin main
-```
+本專案已整合 GitHub Actions 工作流程（`.github/workflows/build-apk.yml`），每當程式碼推送到 `main` 分支時，雲端會自動執行：
 
-### 步驟 3：下載 APK 安裝到手機
-1. 推送完成後，打開 GitHub 專案頁面，點擊上方的 **Actions** 頁籤。
-2. 您會看到 **Build Android APK** 工作流程正在自動運行（約 1~2 分鐘）。
-3. 綠色勾勾完成後，點擊進入該次 Run，在最下方的 **Artifacts** 區塊即可下載 **`AutoPing-v1.0.0-APK`**。
-4. 解壓縮後將 `.apk` 傳到手機（或手機直接用瀏覽器下載），點擊安裝即可使用！
+1. 設定 JDK 17 與 Gradle 8.7。
+2. 編譯 Android Debug APK。
+3. 自動將編譯完成的 `AutoPing-v1.0.0.apk` 發布到 GitHub Release 供所有人公開下載。
